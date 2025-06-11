@@ -3,6 +3,8 @@ module PWFExporter
 import PWF
 import Format
 
+export PWF
+
 export import_pwf, export_pwf, edit_pwf_dbar
 
 
