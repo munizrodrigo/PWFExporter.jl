@@ -5,6 +5,7 @@ import Format
 
 export import_pwf, export_pwf, edit_pwf_dbar
 
+
 const _dbar_dtypes = [("NUMBER", Int64, 1:5), ("OPERATION", Char, 6), 
     ("STATUS", Char, 7), ("TYPE", Int64, 8), ("BASE VOLTAGE GROUP", String, 9:10),
     ("NAME", String, 11:22), ("VOLTAGE LIMIT GROUP", String, 23:24),
@@ -33,12 +34,13 @@ const _default_dbar = Dict("NUMBER" => nothing, "OPERATION" => 'A', "STATUS" => 
     "AGGREGATOR 7" => nothing, "AGGREGATOR 8" => nothing, "AGGREGATOR 9" => nothing, 
     "AGGREGATOR 10" => nothing)
 
-function import_pwf(network_path)
+
+function import_pwf(network_path::AbstractString)
     network = PWF.parse_file(network_path; pm = false)
     return network
 end
 
-function export_pwf(network_dict)
+function export_pwf(pwf_file::IOStream, network_dict::AbstractDict)
     pwf_str = ""
 
     pwf_str *= "TITU\n" * network_dict["TITU"] * "\nDOPC IMPR\n"
@@ -61,14 +63,39 @@ function export_pwf(network_dict)
     
     pwf_str *= "99999\n"
 
-    open("C:\\Users\\Rodrigo\\Downloads\\teste\\teste.pwf","w") do file
-        write(file, pwf_str)
-    end
+    write(pwf_file, pwf_str)
 
     return nothing
 end
 
-function get_dbar_str(network_dict)
+function export_pwf(pwf_filepath::AbstractString, network_dict::AbstractDict)
+    open(pwf_filepath, "w") do pwf_file
+        export_pwf(pwf_file, network_dict)
+    end
+    return nothing
+end
+
+function edit_pwf_dbar(pwf_file::IOStream, original_pwf_filepath::AbstractString, network_dict::AbstractDict)
+    dbar_str = get_dbar_str(network_dict)
+
+    original_pwf = read(original_pwf_filepath, String)
+
+    pattern = Regex(raw"(DBAR\s*\n)(.*?)(\n\s*99999)", "s")
+    substuition = SubstitutionString("DBAR\n" * dbar_str * "99999")
+    new_pwf = replace(original_pwf, pattern => substuition)
+
+    write(pwf_file, new_pwf)
+    return nothing
+end
+
+function edit_pwf_dbar(pwf_filepath::AbstractString, original_pwf_filepath::AbstractString, network_dict::AbstractDict)
+    open(pwf_filepath, "w") do pwf_file
+        edit_pwf_dbar(pwf_file, original_pwf_filepath, network_dict)
+    end
+    return nothing
+end
+
+function get_dbar_str(network_dict::AbstractDict)
     pwf_str = "(No )OETGb(   nome   )Gl( V)( A)( Pg)( Qg)( Qn)( Qm)(Bc  )( Pl)( Ql)( Sh)Are(Vf)\n"
     for dbar_item in sort(collect(values(network_dict["DBAR"])), by=v->v["NUMBER"])
         for dbar_attr in _dbar_dtypes
@@ -104,22 +131,6 @@ function get_dbar_str(network_dict)
         pwf_str *= "\n"
     end
     return pwf_str
-end
-
-function edit_pwf_dbar(network_dict, pwf_file)
-    dbar_str = get_dbar_str(network_dict)
-    # Lê o conteúdo completo do arquivo
-    text = read("C:\\Users\\Rodrigo\\Downloads\\teste\\9barras.pwf", String)
-
-    # Substitui mantendo DBAR e 99999
-    pattern = Regex(raw"(DBAR\s*\n)(.*?)(\n\s*99999)", "s")
-    subst = SubstitutionString("DBAR\n" * dbar_str * "99999")
-    new_text = replace(text, pattern => subst)
-
-    # Escreve de volta no mesmo arquivo (ou em outro, se preferir)
-    open("C:\\Users\\Rodrigo\\Downloads\\teste\\9barrasmod.pwf", "w") do f
-        write(f, new_text)
-    end
 end
 
 end
