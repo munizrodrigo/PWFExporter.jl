@@ -45,18 +45,8 @@ function export_pwf(pwf_file::IOStream, network_dict::AbstractDict)
 
     pwf_str *= "TITU\n" * network_dict["TITU"] * "\nDOPC IMPR\n"
 
-    dopc_impr_row = 1
-    for (dopc_impr_item_name, dopc_impr_item_value) in network_dict["DOPC IMPR"]
-        pwf_str *= "$(dopc_impr_item_name) $(dopc_impr_item_value) "
-        dopc_impr_row += 1
-        if dopc_impr_row >= 11
-            pwf_str *= "\n"
-            dopc_impr_row = 1
-        end
-    end
-    if !endswith(pwf_str, "\n")
-        pwf_str *= "\n"
-    end
+    pwf_str *= get_dopc_impr_str(network_dict)
+
     pwf_str *= "99999\nDBAR\n"
 
     pwf_str *= get_dbar_str(network_dict)
@@ -80,7 +70,7 @@ function edit_pwf_dbar(pwf_file::IOStream, original_pwf_filepath::AbstractString
 
     original_pwf = read(original_pwf_filepath, String)
 
-    pattern = Regex(raw"(DBAR\s*\n)(.*?)(\n\s*99999)", "s")
+    pattern = Regex(raw"(DBAR\s*\n)(.*?)(\n\s*99999)", "s") # Replace everything between DBAR and 99999
     substuition = SubstitutionString("DBAR\n" * dbar_str * "99999")
     new_pwf = replace(original_pwf, pattern => substuition)
 
@@ -95,9 +85,26 @@ function edit_pwf_dbar(pwf_filepath::AbstractString, original_pwf_filepath::Abst
     return nothing
 end
 
+function get_dopc_impr_str(network_dict::AbstractDict)
+    pwf_str = "(Op) E (Op) E (Op) E (Op) E (Op) E (Op) E (Op) E (Op) E (Op) E (Op) E\n"
+    dopc_impr_row = 1
+    for (dopc_impr_item_name, dopc_impr_item_value) in network_dict["DOPC IMPR"]
+        pwf_str *= "$(dopc_impr_item_name) $(dopc_impr_item_value) "
+        dopc_impr_row += 1
+        if dopc_impr_row >= 11
+            pwf_str *= "\n"
+            dopc_impr_row = 1
+        end
+    end
+    if !endswith(pwf_str, "\n")
+        pwf_str *= "\n"
+    end
+    return pwf_str
+end
+
 function get_dbar_str(network_dict::AbstractDict)
     pwf_str = "(No )OETGb(   nome   )Gl( V)( A)( Pg)( Qg)( Qn)( Qm)(Bc  )( Pl)( Ql)( Sh)Are(Vf)\n"
-    for dbar_item in sort(collect(values(network_dict["DBAR"])), by=v->v["NUMBER"])
+    for dbar_item in sort(collect(values(network_dict["DBAR"])), by=v->v["NUMBER"]) # Sort DBAR items by bus number
         for dbar_attr in _dbar_dtypes
             dbar_attr_name = dbar_attr[1]
             dbar_attr_type = dbar_attr[2]
@@ -106,6 +113,7 @@ function get_dbar_str(network_dict::AbstractDict)
             dbar_attr_value = dbar_item[dbar_attr_name]
 
             if !isnothing(dbar_attr_value) && (dbar_attr_value != _default_dbar[dbar_attr_name] || dbar_attr_name == "VOLTAGE") && !(dbar_attr_name == "CONTROLLED BUS" && dbar_attr_value == dbar_item["NUMBER"])
+                # Only write to PWF if value is not nothing, if the value is not the ANAREDE default (except for voltage) and if the controlled bus is not itself
                 if dbar_attr_type <: Integer
                     attr = Format.format("{1:>$(dbar_attr_length)d}", dbar_attr_value)
                 elseif dbar_attr_type <: AbstractFloat
