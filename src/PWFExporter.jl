@@ -69,8 +69,8 @@ function export_pwf(network_dict)
 end
 
 function get_dbar_str(network_dict)
-    pwf_str = ""
-    for dbar_item in values(network_dict["DBAR"])
+    pwf_str = "(No )OETGb(   nome   )Gl( V)( A)( Pg)( Qg)( Qn)( Qm)(Bc  )( Pl)( Ql)( Sh)Are(Vf)\n"
+    for dbar_item in sort(collect(values(network_dict["DBAR"])), by=v->v["NUMBER"])
         for dbar_attr in _dbar_dtypes
             dbar_attr_name = dbar_attr[1]
             dbar_attr_type = dbar_attr[2]
@@ -78,12 +78,12 @@ function get_dbar_str(network_dict)
             dbar_attr_length = length(dbar_attr_columns)
             dbar_attr_value = dbar_item[dbar_attr_name]
 
-            if !isnothing(dbar_attr_value) && dbar_attr_value != _default_dbar[dbar_attr_name]
+            if !isnothing(dbar_attr_value) && (dbar_attr_value != _default_dbar[dbar_attr_name] || dbar_attr_name == "VOLTAGE") && !(dbar_attr_name == "CONTROLLED BUS" && dbar_attr_value == dbar_item["NUMBER"])
                 if dbar_attr_type <: Integer
                     attr = Format.format("{1:>$(dbar_attr_length)d}", dbar_attr_value)
                 elseif dbar_attr_type <: AbstractFloat
                     if !iszero(dbar_attr_value)
-                        attr = Format.format("{1:>$(dbar_attr_length).$(2)f}", 2*dbar_attr_value)
+                        attr = Format.format("{1:>$(dbar_attr_length).$(2)f}", dbar_attr_value)
                     else
                         attr = Format.format("{1:>$(dbar_attr_length)s}", " ")
                     end
@@ -112,8 +112,9 @@ function edit_pwf_dbar(network_dict, pwf_file)
     text = read("C:\\Users\\Rodrigo\\Downloads\\teste\\9barras.pwf", String)
 
     # Substitui mantendo DBAR e 99999
-    pattern = Regex("(DBAR\\s*\\n)(.*?)(\\n\\s*99999)", "s")
-    new_text = replace(text, pattern => dbar_str)
+    pattern = Regex(raw"(DBAR\s*\n)(.*?)(\n\s*99999)", "s")
+    subst = SubstitutionString("DBAR\n" * dbar_str * "99999")
+    new_text = replace(text, pattern => subst)
 
     # Escreve de volta no mesmo arquivo (ou em outro, se preferir)
     open("C:\\Users\\Rodrigo\\Downloads\\teste\\9barrasmod.pwf", "w") do f
